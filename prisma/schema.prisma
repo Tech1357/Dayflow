@@ -1,0 +1,274 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      UserRole @default(EMPLOYEE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee Employee?
+
+  @@map("users")
+}
+
+model Employee {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  employeeId    String    @unique // Human readable employee ID
+  firstName     String
+  lastName      String
+  email         String    @unique
+  phone         String?
+  position      String
+  department    String
+  status        EmployeeStatus @default(ACTIVE)
+  hireDate      DateTime
+  profilePicture String?
+  address       String?   @db.Text
+  
+  // Personal Information
+  dateOfBirth   DateTime?
+  nationality   String?
+  maritalStatus MaritalStatus?
+  gender        Gender?
+  
+  // Emergency Contact
+  emergencyContactName         String?
+  emergencyContactRelationship String?
+  emergencyContactPhone        String?
+  
+  // Relations
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankDetails   BankDetails?
+  salaryInfo    SalaryInfo?
+  attendanceRecords Attendance[]
+  timeOffRequests   TimeOffRequest[]
+  documents     Document[]
+  skills        Skill[]
+  
+  // Manager Relations
+  managerId     String?
+  manager       Employee? @relation("ManagerEmployee", fields: [managerId], references: [id])
+  subordinates  Employee[] @relation("ManagerEmployee")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("employees")
+}
+
+model BankDetails {
+  id              String @id @default(cuid())
+  employeeId      String @unique
+  accountHolderName String
+  accountNumber   String
+  bankName        String
+  routingNumber   String
+  accountType     AccountType @default(CHECKING)
+  
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("bank_details")
+}
+
+model SalaryInfo {
+  id              String @id @default(cuid())
+  employeeId      String @unique
+  baseSalary      Decimal @db.Decimal(10, 2)
+  currency        String @default("USD")
+  paySchedule     PaySchedule @default(MONTHLY)
+  effectiveDate   DateTime
+  
+  // Allowances
+  houseRentAllowance    Decimal @default(0) @db.Decimal(10, 2)
+  standardAllowance     Decimal @default(0) @db.Decimal(10, 2)
+  performanceBonus      Decimal @default(0) @db.Decimal(10, 2)
+  leaveTravelAllowance  Decimal @default(0) @db.Decimal(10, 2)
+  fixedAllowance        Decimal @default(0) @db.Decimal(10, 2)
+  
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("salary_info")
+}
+
+model Attendance {
+  id          String @id @default(cuid())
+  employeeId  String
+  date        DateTime @db.Date
+  checkIn     DateTime?
+  checkOut    DateTime?
+  workHours   Decimal? @db.Decimal(4, 2)
+  extraHours  Decimal? @db.Decimal(4, 2)
+  status      AttendanceStatus
+  notes       String? @db.Text
+  
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@map("attendance")
+}
+
+model TimeOffRequest {
+  id              String @id @default(cuid())
+  employeeId      String
+  type            TimeOffType
+  startDate       DateTime @db.Date
+  endDate         DateTime @db.Date
+  days            Int
+  reason          String @db.Text
+  status          RequestStatus @default(PENDING)
+  attachmentPath  String?
+  
+  // Approval Info
+  approverId      String?
+  approverName    String?
+  approvedAt      DateTime?
+  rejectionReason String? @db.Text
+  
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("time_off_requests")
+}
+
+model Document {
+  id          String @id @default(cuid())
+  employeeId  String
+  name        String
+  type        DocumentType
+  filePath    String
+  fileSize    Int
+  uploadDate  DateTime @default(now())
+  
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model Skill {
+  id          String @id @default(cuid())
+  employeeId  String
+  name        String
+  level       Int // 1-5 star rating
+  category    String
+  
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("skills")
+}
+
+model TimeOffBalance {
+  id                String @id @default(cuid())
+  employeeId        String @unique
+  paidTimeOffTotal  Int @default(30)
+  paidTimeOffUsed   Int @default(0)
+  sickLeaveTotal    Int @default(10) 
+  sickLeaveUsed     Int @default(0)
+  year              Int
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([employeeId, year])
+  @@map("time_off_balances")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+}
+
+enum PaySchedule {
+  WEEKLY
+  BI_WEEKLY
+  SEMI_MONTHLY
+  MONTHLY
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+  HOLIDAY
+  SICK
+}
+
+enum TimeOffType {
+  PAID_TIME_OFF
+  SICK_LEAVE
+  UNPAID_LEAVE
+  MATERNITY_LEAVE
+  PATERNITY_LEAVE
+  BEREAVEMENT_LEAVE
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentType {
+  RESUME
+  CERTIFICATE
+  ID_DOCUMENT
+  CONTRACT
+  OTHER
+}
